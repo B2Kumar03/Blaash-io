@@ -1,14 +1,16 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { AiOutlineYoutube } from "react-icons/ai"; // Importing YouTube icon
 import { FcGoogle } from "react-icons/fc"; // Google icon for the button
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth"; 
 import { app } from "../firebaseConfig"; // Firebase config
+import { context } from "./ApiContext";
 
 function Header({ onImport }) {
   const [user, setUser] = useState(null);  // State to store the logged-in user's information
-
+  const [isImported,setIsimported]=useState(false)
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
+  const {isLoading, setIsloading}=useContext(context)
 
   // Handle Google login
   const handleGoogleLogin = () => {
@@ -26,11 +28,14 @@ function Header({ onImport }) {
   const handleLogout = () => {
     signOut(auth)
       .then(() => {
+        console.log(user);
         setUser(null);  // Reset user state after logging out
       })
       .catch((error) => {
         console.error("Error during logout:", error.message);
       });
+      
+      ;
   };
 
   return (
@@ -42,7 +47,13 @@ function Header({ onImport }) {
       <div className=" flex gap-2 justify-center items-center  ">
         {/* Import Button */}
         <button
-          onClick={onImport}
+          onClick={async()=>{
+            if(isImported)return
+            setIsimported(true)
+            setIsloading((prev)=>!prev)
+            await onImport()
+            setIsloading((prev)=>!prev)
+          }}
           className="flex items-center bg-white text-blue-600 font-semibold py-2 px-4 rounded hover:bg-blue-100 transition"
         >
           <AiOutlineYoutube className="mr-2" /> {/* YouTube Icon */}

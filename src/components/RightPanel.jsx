@@ -4,11 +4,16 @@ import { ref, set, onValue } from "firebase/database";
 import { database } from "../firebaseConfig";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios';  // Import Axios
 
-const RightPanel = ({ selectedPlaylist }) => {
+const RightPanel = ({ selectedPlaylist, playListId }) => {
   const [thumbnailTitle, setThumbnailTitle] = useState('Get Sporty in Style');
   const [videoStatus, setVideoStatus] = useState('active');
   const [videos, setVideos] = useState([]);
+  const [dragedIndex, setDragedIndex] = useState([]);
+  const [loading, setLoading] = useState(false);  // Track loading state
+
+  console.log(selectedPlaylist,"f");
 
   // Fetch playlist data from Firebase
   const fetchData = () => {
@@ -23,15 +28,25 @@ const RightPanel = ({ selectedPlaylist }) => {
     });
   };
 
-  // Save playlist data to Firebase
-  const saveOnFirebase = () => {
-    set(ref(database, 'users'+'/playlist1'), videos)
-      .then(() => {
-        toast.success('Playlist saved successfully!');
-      })
-      .catch((error) => {
-        toast.error('Error saving playlist: ' + error.message);
+  // Save playlist data to the backend
+  const savePlaylist = async () => {
+    setLoading(true);  // Set loading to true when saving starts
+    try {
+      const response = await axios.post('https://porifolio-builder-backend-1.onrender.com/api/v1/playlist', {
+        id: playListId,  // Sending the playlist ID
+        playlistVide: videos  // Sending the updated playlist videos
       });
+
+      if (response.status === 200) {
+        toast.success('Playlist updated successfully!');
+      } else {
+        toast.error('Failed to update playlist!');
+      }
+    } catch (error) {
+      toast.error('Error saving playlist: ' + error.message);
+    } finally {
+      setLoading(false);  // Stop loading when the saving process finishes
+    }
   };
 
   useEffect(() => {
@@ -39,28 +54,34 @@ const RightPanel = ({ selectedPlaylist }) => {
   }, []);
 
   useEffect(() => {
-    if (selectedPlaylist?.items) {
-      setVideos(selectedPlaylist.items);
+    if (selectedPlaylist) {
+      console.log("Right pannel",selectedPlaylist);
+      setVideos(selectedPlaylist);
     }
   }, [selectedPlaylist]);
+
+  // Reset dragedIndex when playListId changes
+  useEffect(() => {
+    setDragedIndex([]); // Clear the dragged index
+  }, [playListId]);
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
 
     const reorderedVideos = Array.from(videos);
     const [movedVideo] = reorderedVideos.splice(result.source.index, 1);
+    setDragedIndex((prev) => [...prev, result.destination.index]); // Update dragged index
     reorderedVideos.splice(result.destination.index, 0, movedVideo);
 
     setVideos(reorderedVideos);
-    saveOnFirebase(); // Save the new order to Firebase
   };
 
   return (
-    <div className='w-full lg:w-[40%] bg-[#293245] rounded-lg md:ml-4 p-4 '>
+    <div className='w-full lg:w-[40%] bg-[#293245] rounded-lg md:ml-4 p-4'>
       <ToastContainer />
       <h2 className='text-xl font-bold mb-4'>Product Playlists</h2>
 
-      <div className='mb-4 '>
+      <div className='mb-4'>
         <label className='block mb-2 font-semibold text-gray-300'>Thumbnail Title</label>
         <input
           type='text'
@@ -111,9 +132,11 @@ const RightPanel = ({ selectedPlaylist }) => {
                   <Draggable key={video.id} draggableId={video.id} index={index}>
                     {(provided, snapshot) => (
                       <li
-                        className={`bg-[#1f2733] p-4 mb-2 rounded-lg flex justify-between items-center ${
+                        className={`bg-[#1f2733] ${
+                          dragedIndex.includes(index) ? 'bg-[red]' : 'bg-[#1f2733]'
+                        } p-4 mb-2 rounded-lg flex justify-between items-center ${
                           snapshot.isDragging ? 'shadow-lg opacity-75' : ''
-                        }`} 
+                        }`}
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
@@ -144,10 +167,15 @@ const RightPanel = ({ selectedPlaylist }) => {
       </div>
 
       <button
-        onClick={saveOnFirebase} 
-        className='w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-4 rounded-lg'
+        onClick={savePlaylist}
+        className='w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 mt-4 rounded-lg flex justify-center items-center'
+        disabled={loading}  // Disable the button while saving
       >
-        Update Playlist
+        {loading ? (
+          <div className="spinner-border animate-spin inline-block w-4 h-4 border-2 rounded-full mr-2" role="status"></div>
+        ) : (
+          'Update Playlist'
+        )}
       </button>
     </div>
   );
